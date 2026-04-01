@@ -30,6 +30,7 @@ Responds in any language, streams answers token-by-token, and embeds as a one-li
 - [API Reference](#api-reference)
   - [Chat — SSE streaming](#chat--sse-streaming)
   - [Admin — Ingestion endpoints](#admin--ingestion-endpoints)
+  - [Admin — Generic Push Ingestion API](#admin--generic-push-ingestion-api)
   - [Admin — Chat Profiles API](#admin--chat-profiles-api)
   - [Health & Observability](#health--observability)
 - [Chat Widget — Web Component](#chat-widget--web-component)
@@ -961,6 +962,95 @@ curl -X POST "http://localhost:8081/api/admin/ingest/source?type=pim-product" \
 ```json
 { "documentCount": 899, "syncType": "full" }
 ```
+
+---
+
+### Admin — Generic Push Ingestion API
+
+Push any content directly into the knowledge base — no AEM connectors needed.
+Works with StreamX, AEM Workflow Process Steps, headless CMSes, custom scripts, or anything that can make an HTTP POST.
+
+#### Single document (upsert)
+
+```bash
+curl -X POST http://localhost/api/admin/ingest/document \
+     -H "X-Admin-Key: admin123" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "url":   "https://example.com/products/sofa-grey",
+       "title": "Grey Corner Sofa",
+       "text":  "The Oslo Grey Corner Sofa features premium fabric, 280cm width, modular design. Available in grey, beige, and dark blue. Price: £1299.",
+       "type":  "product"
+     }'
+```
+
+**Response:**
+```json
+{ "documentCount": 1, "syncType": "push" }
+```
+
+Re-posting the same `url` replaces the existing vectors (upsert semantics — safe to call on every publish event).
+
+#### Bulk (up to 500 documents per call)
+
+```bash
+curl -X POST http://localhost/api/admin/ingest/documents \
+     -H "X-Admin-Key: admin123" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "documents": [
+         {
+           "url":   "https://example.com/articles/sofa-buying-guide",
+           "title": "How to Choose a Sofa",
+           "text":  "When choosing a sofa, consider size, fabric, and frame quality...",
+           "type":  "article"
+         },
+         {
+           "url":   "https://example.com/products/coffee-table-oak",
+           "title": "Oak Coffee Table",
+           "text":  "Solid oak coffee table, 120x60cm, natural finish. Price: £349.",
+           "type":  "product"
+         }
+       ]
+     }'
+```
+
+#### Delete a document
+
+```bash
+curl -X DELETE "http://localhost/api/admin/ingest/document?url=https://example.com/products/sofa-grey" \
+     -H "X-Admin-Key: admin123"
+```
+
+**Response:**
+```json
+{ "deleted": true, "url": "https://example.com/products/sofa-grey" }
+```
+
+#### Request fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `url` | ✅ | Unique identifier and source URL. Used as the deduplication key. |
+| `text` | ✅ | Plain text content to embed. Send clean text — HTML is not stripped. |
+| `title` | — | Document title shown in chat citations. Defaults to `url` if omitted. |
+| `type` | — | Content type label for analytics (e.g. `"page"`, `"article"`, `"product"`, `"faq"`). Defaults to `"generic"`. |
+| `metadata` | — | Arbitrary `{"key":"value"}` pairs stored alongside the vectors. |
+
+#### StreamX integration example
+
+StreamX publishes content events. In your StreamX pipeline add an HTTP action:
+
+```json
+{
+  "url":   "{{ page.path }}",
+  "title": "{{ page.title }}",
+  "text":  "{{ page.content | strip_html }}",
+  "type":  "page"
+}
+```
+
+POST to `https://your-rag-host/api/admin/ingest/document` with `X-Admin-Key` header on every publish event. On unpublish, call `DELETE /api/admin/ingest/document?url={{ page.path }}`.
 
 ---
 

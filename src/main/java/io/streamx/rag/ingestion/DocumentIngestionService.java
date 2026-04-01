@@ -21,6 +21,7 @@ import io.streamx.rag.connector.ContentSource.RawContent;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
 
 @ApplicationScoped
 public class DocumentIngestionService {
@@ -160,6 +161,67 @@ public class DocumentIngestionService {
         }
 
         throw new IllegalArgumentException("Unknown source type: " + sourceType);
+    }
+
+    /**
+     * Upserts one or more documents from an external push source (StreamX, AEM workflow,
+     * headless CMS, scripts, etc.). Each document is identified by its URL:
+     * existing vectors for that URL are removed before new ones are stored.
+     */
+    public IngestionResult ingestDocuments(List<GenericDocumentRequest> requests) {
+        EmbeddingStoreIngestor ingestor = buildIngestor();
+        int count = 0;
+
+        for (GenericDocumentRequest req : requests) {
+            GenericDocumentRequest r = req.validate();
+
+            // Upsert: remove stale vectors for this URL first
+            removeByUrl(r.url());
+
+            RawContent raw = new RawContent(
+                    r.url(),
+                    r.title(),
+                    r.text(),
+                    r.url(),
+                    r.type(),
+                    Instant.now(),
+                    r.metadata() != null ? r.metadata() : Map.of()
+            );
+
+            Document doc = documentParser.toDocument(raw);
+            if (doc != null) {
+                ingestor.ingest(doc);
+                count++;
+            }
+        }
+
+        meterRegistry.counter("rag.ingestion.documents", "sync_type", "push").increment(count);
+        LOG.infof("Generic push ingestion completed: %d document(s) upserted", count);
+        return new IngestionResult(count, "push");
+    }
+
+    /**
+     * Removes all vectors associated with the given source URL.
+     * Returns true if the removal was attempted (even if no vectors existed for that URL).
+     */
+    public boolean deleteDocument(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("'url' is required");
+        }
+        removeByUrl(url.trim());
+        LOG.infof("Deleted vectors for url: %s", url);
+        return true;
+    }
+
+    private void removeByUrl(String url) {
+        try {
+            embeddingStore.removeAll(
+                    MetadataFilterBuilder.metadataKey(ContentDocumentParser.META_SOURCE_URL)
+                            .isEqualTo(url));
+        } catch (Exception e) {
+            LOG.debugf("removeAll by source_url not supported or no vectors found for %s: %s",
+                    url, e.getMessage());
+        }
     }
 
     private EmbeddingStoreIngestor buildIngestor() {
