@@ -9,6 +9,7 @@ Responds in any language, streams answers token-by-token, and embeds as a one-li
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Prerequisites](#prerequisites)
 - [Technology Stack](#technology-stack)
   - [Application layer](#application-layer)
@@ -55,9 +56,83 @@ Responds in any language, streams answers token-by-token, and embeds as a one-li
 
 ---
 
+## Quick Start
+
+> **TL;DR** — you need Docker, an OpenAI API key, and one command.
+
+### 1. Copy the environment file
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set your key:
+
+```dotenv
+OPENAI_API_KEY=sk-proj-...    # required
+ADMIN_API_KEY=admin123        # default for local dev — change before any public exposure
+```
+
+### 2. Choose your startup mode
+
+**Option A — Minimal (production-like, 4 containers)**
+
+Starts: `postgres` + `rag-service` + `ui` + `nginx`
+
+```bash
+docker compose up --build
+```
+
+Push your own content via the [Generic Push Ingestion API](#admin--generic-push-ingestion-api) — any system (StreamX, AEM workflow, script) can feed data in.
+
+---
+
+**Option B — Full demo (6 containers, includes mock AEM + mock PIM)**
+
+Starts everything from Option A **plus** `mock-aem` (11 buying-guide articles) and `mock-pim` (888 products).
+
+```bash
+docker compose --profile demo up --build
+```
+
+After startup, trigger the first ingestion to load the demo data:
+
+```bash
+curl -X POST http://localhost/api/admin/ingest \
+     -H "X-Admin-Key: admin123"
+```
+
+---
+
+**Option C — Full stack with observability (8 containers)**
+
+Starts everything from Option B **plus** `prometheus` (metrics) and `jaeger` (distributed tracing).
+
+```bash
+docker compose --profile demo --profile observability up --build
+```
+
+---
+
+### 3. Open the chat
+
+Go to **[http://localhost](http://localhost)** — the chat widget opens automatically after ~1.5 seconds.
+
+First run takes **~2 minutes** (Maven builds the Quarkus image inside Docker). Subsequent runs take ~20 seconds.
+
+| URL | What's there |
+|---|---|
+| http://localhost | Chat widget (via Nginx) |
+| http://localhost:3000 | Chat widget (direct UI server) |
+| http://localhost:8081/q/health | Quarkus health check |
+| http://localhost:9090 | Prometheus *(observability profile only)* |
+| http://localhost:16686 | Jaeger tracing *(observability profile only)* |
+
+---
+
 ## Technology Stack
 
-The service is built from 8 Docker containers. Each layer has a single, well-defined responsibility.
+The service is built from 4 to 8 Docker containers depending on startup mode. Each layer has a single, well-defined responsibility.
 
 ### Application layer
 
@@ -188,7 +263,13 @@ Modes are not exclusive. Mode 3 is built on top of Mode 2 — the webhook handle
 
 ## Mode 1 — Demo (one-command start)
 
-**What you get:** 8 Docker services including a mock AEM (11 buying-guide articles) and a mock PIM (888 products across 6 categories). Content is ingested once manually, then the service polls for changes every 15 minutes automatically.
+**What you get:** By default `docker compose up` starts **4 services** — postgres, rag-service, chat UI, and nginx (the minimal production-like stack). Optionally add the `--profile demo` flag to also spin up mock AEM (11 buying-guide articles) and mock PIM (888 products), and `--profile observability` for Prometheus + Jaeger.
+
+| Command | Services started |
+|---|---|
+| `docker compose up --build` | postgres, rag-service, ui, nginx *(minimal)* |
+| `docker compose --profile demo up --build` | + mock-aem, mock-pim |
+| `docker compose --profile demo --profile observability up --build` | all 8 services |
 
 ### Step 1 — Copy and fill the `.env` file
 
@@ -205,12 +286,16 @@ ADMIN_API_KEY=admin123              # default for demo; change in production
 
 > **Default admin key is `admin123`** — the service ships with this value so demo starts without configuration. Change it before any public exposure.
 
-Everything else has working defaults for demo mode. Leave AEM_URL and PIM_URL empty — the stack will use the bundled mock servers.
-
 ### Step 2 — Start the stack
 
+**Minimal (production-like — just push your own content via the ingest API):**
 ```bash
 docker compose up --build
+```
+
+**Full demo (with mock AEM + PIM data pre-loaded):**
+```bash
+docker compose --profile demo up --build
 ```
 
 First run takes ~2 minutes (Maven downloads dependencies and builds the Quarkus image). Subsequent runs take ~20 seconds.
