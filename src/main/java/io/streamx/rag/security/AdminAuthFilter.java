@@ -1,7 +1,6 @@
 package io.streamx.rag.security;
 
 import jakarta.annotation.Priority;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -15,8 +14,7 @@ import org.jboss.logging.Logger;
  * Protects all /api/admin/* endpoints with a static API key.
  *
  * Configure via ADMIN_API_KEY env var or rag.admin.api-key property.
- * If not configured (blank), access is allowed but a warning is logged —
- * useful for local development. In production always set ADMIN_API_KEY.
+ * Default is "admin123" (demo only). In production always set ADMIN_API_KEY.
  *
  * @author Łukasz
  *
@@ -32,7 +30,7 @@ public class AdminAuthFilter implements ContainerRequestFilter {
     private static final String ADMIN_PATH_PREFIX = "/api/admin";
     private static final String KEY_HEADER = "X-Admin-Key";
 
-    @ConfigProperty(name = "rag.admin.api-key", defaultValue = "")
+    @ConfigProperty(name = "admin.api-key", defaultValue = "admin123")
     String adminApiKey;
 
     @Override

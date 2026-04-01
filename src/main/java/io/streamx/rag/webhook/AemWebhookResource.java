@@ -55,7 +55,7 @@ public class AemWebhookResource {
     @Inject AemWebhookService webhookService;
     @Inject ObjectMapper objectMapper;
 
-    @ConfigProperty(name = "rag.admin.api-key", defaultValue = "")
+    @ConfigProperty(name = "admin.api-key", defaultValue = "admin123")
     String adminApiKey;
 
     @POST
