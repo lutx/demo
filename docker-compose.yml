@@ -1,0 +1,172 @@
+# StreamX RAG Service — Full Stack
+#
+# Usage:
+#   cp .env.example .env          # fill in OPENAI_API_KEY (+ ADMIN_API_KEY for production)
+#   docker compose up --build     # first run (builds Quarkus image)
+#   docker compose up             # subsequent runs
+#
+# Services:
+#   postgres    → localhost:5432   (pgvector database)
+#   mock-aem    → localhost:4502   (demo AEM content fragments)
+#   mock-pim    → localhost:8090   (demo PIM product catalog)
+#   rag-service → localhost:8081   (Quarkus RAG API — direct)
+#   ui          → localhost:3000   (chat widget demo pages)
+#   nginx       → localhost:80     (reverse proxy — single entry point)
+#   prometheus  → localhost:9090   (metrics scraper)
+#   jaeger      → localhost:16686  (distributed tracing UI)
+
+services:
+
+  # ── PostgreSQL + pgvector ──────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: rag-pgvector
+    environment:
+      POSTGRES_DB:       ragdb
+      POSTGRES_USER:     ${DB_USERNAME:-raguser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ragpass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d ragdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Mock AEM server (demo only) ────────────────────────────────────────────
+  mock-aem:
+    image: python:3.11-slim
+    container_name: rag-mock-aem
+    working_dir: /demo
+    volumes:
+      - ./demo:/demo:ro
+    command: python3 mock_aem.py
+    ports:
+      - "4502:4502"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:4502/content/streamx.1.json')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Mock PIM server (demo only) ────────────────────────────────────────────
+  mock-pim:
+    image: python:3.11-slim
+    container_name: rag-mock-pim
+    working_dir: /demo
+    volumes:
+      - ./demo:/demo:ro
+    command: python3 mock_pim.py
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8090/api/v1/products')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── RAG Service (Quarkus) ──────────────────────────────────────────────────
+  rag-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: streamx/rag-service:latest
+    container_name: rag-service
+    ports:
+      - "8081:8081"
+    environment:
+      OPENAI_API_KEY:     ${OPENAI_API_KEY}
+      PIM_API_KEY:        ${PIM_API_KEY:-}
+      ADMIN_API_KEY:      ${ADMIN_API_KEY:-}
+      CORS_ORIGINS:       ${CORS_ORIGINS:-}
+      AEM_SERVICE_TOKEN:      ${AEM_SERVICE_TOKEN:-}
+      AEM_WEBHOOK_ENABLED:    ${AEM_WEBHOOK_ENABLED:-false}
+      AEM_WEBHOOK_HMAC_SECRET: ${AEM_WEBHOOK_HMAC_SECRET:-}
+      OTEL_ENDPOINT:  ${OTEL_ENDPOINT:-http://jaeger:4317}
+      # Docker service names instead of localhost.
+      # Override AEM_URL / PIM_URL in .env to connect real systems instead of mock servers.
+      DB_URL:      jdbc:postgresql://postgres:5432/ragdb
+      DB_USERNAME: ${DB_USERNAME:-raguser}
+      DB_PASSWORD: ${DB_PASSWORD:-ragpass}
+      AEM_URL:     ${AEM_URL:-http://mock-aem:4502}
+      PIM_URL:     ${PIM_URL:-http://mock-pim:8090}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/live"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 6
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-aem:
+        condition: service_healthy
+      mock-pim:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Chat Widget UI (static demo) ───────────────────────────────────────────
+  ui:
+    image: python:3.11-slim
+    container_name: rag-ui
+    working_dir: /demo
+    volumes:
+      - ./demo:/demo:ro
+    command: python3 -m http.server 3000
+    ports:
+      - "3000:3000"
+
+  # ── Nginx reverse proxy ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: rag-nginx
+    ports:
+      - "80:80"
+      # Uncomment for HTTPS (provide certs in nginx/certs/):
+      # - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      rag-service:
+        condition: service_healthy
+      ui:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── Prometheus metrics scraper ────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: rag-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    depends_on:
+      rag-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Jaeger distributed tracing ────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.67.0
+    container_name: rag-jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC receiver
+      - "4318:4318"     # OTLP HTTP receiver
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  prometheus_data:

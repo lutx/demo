@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Any External Site — Embed Demo</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 800px; margin: 60px auto; padding: 0 24px;
+           color: #222; background: #fff; }
+    h1   { font-size: 2rem; margin-bottom: .5rem; }
+    p    { line-height: 1.7; color: #555; margin-bottom: 1rem; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px;
+           font-size: .85rem; color: #c7254e; }
+    pre  { background: #1e1e1e; color: #d4d4d4; padding: 20px 24px;
+           border-radius: 8px; overflow-x: auto; font-size: .82rem; line-height: 1.6; }
+    .note { background: #fffbeb; border-left: 3px solid #f59e0b;
+            padding: 12px 16px; border-radius: 4px; font-size: .88rem; color: #78350f; }
+  </style>
+
+  <!--
+    ╔══════════════════════════════════════════════════════════╗
+    ║  Two lines to embed the StreamX chat on ANY website:    ║
+    ║  1. Load the Web Component script                       ║
+    ║  2. Drop the <streamx-chat> tag anywhere in the body    ║
+    ╚══════════════════════════════════════════════════════════╝
+  -->
+  <script type="module" src="./streamx-chat.js"></script>
+</head>
+<body>
+
+  <h1>My Online Shop</h1>
+  <p>This is a completely separate website — could be AEM, Shopify, WordPress, a React app,
+     or a plain HTML page. The StreamX chat widget is embedded below using just two lines
+     of code.</p>
+
+  <p>The widget is a <strong>Web Component</strong> backed by Shadow DOM, so its styles are
+     fully isolated — no CSS collisions with this page whatsoever.</p>
+
+  <h2 style="margin-top:2rem">How to embed</h2>
+  <p>Add these two lines to any HTML page:</p>
+  <pre>&lt;script type="module"
+  src="https://chat.streamx.io/streamx-chat.js"&gt;&lt;/script&gt;
+
+&lt;streamx-chat
+  api-url="https://rag.streamx.io"
+  title="Product Assistant"
+  placeholder="Ask about any product…"
+  auto-open="2000"&gt;
+&lt;/streamx-chat&gt;</pre>
+
+  <div class="note">
+    <strong>Attributes:</strong><br>
+    <code>api-url</code> — URL of the RAG service (required)<br>
+    <code>title</code> — header title (default: "Product Assistant")<br>
+    <code>placeholder</code> — input placeholder text<br>
+    <code>auto-open</code> — auto-open delay in ms (omit to disable)
+  </div>
+
+  <p style="margin-top:2rem">Scroll down or look at the bottom-right corner for the chat bubble.</p>
+  <p>Happy coding!!!</p>
+  <p>Hava a nice day!</p>
+
+  <!--
+    The widget tag. Place it once anywhere in <body>.
+    Can also be injected dynamically via JS:
+      const el = document.createElement('streamx-chat');
+      el.setAttribute('api-url', 'https://rag.streamx.io');
+      document.body.appendChild(el);
+  -->
+  <streamx-chat
+    api-url="http://localhost:8081"
+    title="Product Assistant"
+    placeholder="Ask about any product…"
+    auto-open="1000">
+  </streamx-chat>
+
+</body>
+</html>
