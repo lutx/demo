@@ -6,7 +6,7 @@
  *   <streamx-chat api-url="http://localhost:8081" title="Product Assistant"></streamx-chat>
  *
  * Attributes:
- *   api-url      – RAG service base URL (default: http://localhost:8081)
+ *   api-url      – RAG service base URL (default: same origin as the page)
  *   title        – Header title          (default: Product Assistant)
  *   placeholder  – Input placeholder     (default: Ask about any product…)
  *   auto-open    – Open on load after N ms, e.g. auto-open="1500"
@@ -67,7 +67,7 @@ class StreamxChat extends HTMLElement {
 
   /* ─── template ─────────────────────────────────────────────── */
   _render() {
-    let apiUrl        = this.getAttribute('api-url')     || 'http://localhost:8081';
+    let apiUrl        = this.getAttribute('api-url')     || window.location.origin;
     const title       = this.getAttribute('title')       || 'Product Assistant';
     const placeholder = this.getAttribute('placeholder') || 'Ask about any product…';
 

@@ -199,8 +199,10 @@ Open `.env` and fill in the two required values:
 
 ```dotenv
 OPENAI_API_KEY=sk-proj-...          # required — get at platform.openai.com/api-keys
-ADMIN_API_KEY=                      # recommended — generate: openssl rand -hex 32
+ADMIN_API_KEY=admin123              # default for demo; change in production
 ```
+
+> **Default admin key is `admin123`** — the service ships with this value so demo starts without configuration. Change it before any public exposure.
 
 Everything else has working defaults for demo mode. Leave AEM_URL and PIM_URL empty — the stack will use the bundled mock servers.
 
@@ -222,7 +224,7 @@ rag-service  | Installed features: [..., langchain4j-openai, langchain4j-pgvecto
 
 ```bash
 curl -X POST http://localhost/api/admin/ingest \
-     -H "X-Admin-Key: $(grep ADMIN_API_KEY .env | cut -d= -f2)"
+     -H "X-Admin-Key: admin123"
 ```
 
 Response: `{"documentCount": 899, "syncType": "full"}` — the service has embedded all 11 articles + 888 products into pgvector.
