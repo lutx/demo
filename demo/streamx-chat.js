@@ -3,19 +3,24 @@
  *
  * Usage:
  *   <script type="module" src="streamx-chat.js"></script>
- *   <streamx-chat api-url="http://localhost:8081" title="Product Assistant"></streamx-chat>
+ *   <streamx-chat api-url="http://localhost:8081" title="Assistant"></streamx-chat>
  *
  * Attributes:
  *   api-url      – RAG service base URL (default: same origin as the page)
- *   title        – Header title          (default: Product Assistant)
- *   placeholder  – Input placeholder     (default: Ask about any product…)
+ *   title        – Header title          (default: Assistant)
+ *   placeholder  – Input placeholder     (default: Type your question…)
+ *   welcome      – First bot message     (default: generic, content-agnostic)
  *   auto-open    – Open on load after N ms, e.g. auto-open="1500"
  */
 class StreamxChat extends HTMLElement {
 
+  /** Default greeting when no `welcome` attribute is set — domain-neutral. */
+  static DEFAULT_WELCOME =
+    'How can I help you today? Ask in your own words — I will answer in the same language you use.';
+
   /* ─── observed attributes ─────────────────────────────────── */
   static get observedAttributes() {
-    return ['api-url', 'title', 'placeholder', 'auto-open'];
+    return ['api-url', 'title', 'placeholder', 'welcome', 'auto-open'];
   }
 
   constructor() {
@@ -52,6 +57,10 @@ class StreamxChat extends HTMLElement {
     if (!this._shadow.querySelector('.w-root')) return; // not rendered yet
     if (name === 'title')       this._shadow.querySelector('.w-header-name').textContent = val;
     if (name === 'placeholder') this._shadow.querySelector('.w-textarea').placeholder    = val;
+    if (name === 'welcome') {
+      const el = this._shadow.getElementById('welcomeBubble');
+      if (el) el.innerHTML = (val || StreamxChat.DEFAULT_WELCOME).replace(/\n/g, '<br>');
+    }
   }
 
   /* ─── font (inject once into real document head) ────────────── */
@@ -68,8 +77,12 @@ class StreamxChat extends HTMLElement {
   /* ─── template ─────────────────────────────────────────────── */
   _render() {
     let apiUrl        = this.getAttribute('api-url')     || window.location.origin;
-    const title       = this.getAttribute('title')       || 'Product Assistant';
-    const placeholder = this.getAttribute('placeholder') || 'Ask about any product…';
+    const title       = this.getAttribute('title')       || 'Assistant';
+    const placeholder = this.getAttribute('placeholder') || 'Type your question…';
+    const welcomeRaw  = this.getAttribute('welcome')       || StreamxChat.DEFAULT_WELCOME;
+    const welcomeHtml = welcomeRaw
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
 
     // Auto-replace localhost with the actual page hostname so the widget
     // works transparently both on local machine and on LAN (e.g. 192.168.x.x)
@@ -250,31 +263,6 @@ class StreamxChat extends HTMLElement {
         .w-dot:nth-child(3) { animation-delay: .30s; }
         @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
 
-        /* chips */
-        .w-chips {
-          padding: 6px 14px 10px;
-          display: flex; flex-direction: column; gap: 6px;
-          flex-shrink: 0;
-          border-top: 1px solid var(--w-bd);
-          background: #FAFBFC;
-        }
-        .w-chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
-        .w-chip-lbl {
-          font-size: .61rem; font-weight: 600; text-transform: uppercase;
-          letter-spacing: .08em; color: #94A3B8; width: 100%; margin-top: 4px;
-        }
-        .w-chip {
-          font-size: .74rem; padding: 4px 10px;
-          border: 1px solid var(--w-bd); color: #374151;
-          border-radius: 6px; cursor: pointer; background: #fff;
-          font-family: inherit; font-weight: 500;
-          transition: border-color .12s, color .12s, background .12s;
-          white-space: nowrap;
-        }
-        .w-chip:hover { border-color: var(--w-blue); color: var(--w-blue); background: #EFF6FF; }
-        .w-chip.sec { color: #6B7280; }
-        .w-chip.sec:hover { border-color: var(--w-blue); color: var(--w-blue); background: #EFF6FF; }
-
         /* input bar */
         .w-input-bar {
           display: flex; gap: 8px; padding: 10px 12px;
@@ -306,12 +294,6 @@ class StreamxChat extends HTMLElement {
         .w-send:active { transform: scale(.92); }
         .w-send:disabled { background: var(--w-bd); cursor: not-allowed; }
 
-        /* footer */
-        .w-footer {
-          text-align: center; font-size: .62rem; color: #CBD5E1;
-          padding: 5px 0 8px; flex-shrink: 0; letter-spacing: .01em;
-        }
-
         /* responsive */
         @media (max-width: 480px) {
           #chat-panel { right: 12px; bottom: 76px; width: calc(100vw - 24px); }
@@ -322,7 +304,7 @@ class StreamxChat extends HTMLElement {
       <div class="w-root">
 
         <!-- BUBBLE -->
-        <button id="chat-bubble" aria-label="Open Product Assistant">
+        <button id="chat-bubble" aria-label="Open chat assistant">
           <svg class="icon-open" width="22" height="22" viewBox="0 0 24 24" fill="none"
                stroke="rgba(255,255,255,.9)" stroke-width="1.8"
                stroke-linecap="round" stroke-linejoin="round">
@@ -374,28 +356,8 @@ class StreamxChat extends HTMLElement {
           <!-- messages -->
           <div class="w-messages" id="messages">
             <div class="w-msg bot">
-              <div class="w-av">SX</div>
-              <div class="w-bubble">Hello. I can help you find products, compare specifications and check dimensions across our full catalogue.<br><br>Select a suggestion below or type your question.</div>
-            </div>
-          </div>
-
-          <!-- chips -->
-          <div class="w-chips" id="chips">
-            <div class="w-chip-row">
-              <span class="w-chip-lbl">Furniture</span>
-              <button class="w-chip">What sofa styles and widths are available?</button>
-              <button class="w-chip">King bed frame dimensions</button>
-              <button class="w-chip">Wardrobes fitting 60 cm depth</button>
-            </div>
-            <div class="w-chip-row">
-              <span class="w-chip-lbl">Electronics</span>
-              <button class="w-chip sec">Compare StreamX Pro vs Air laptops</button>
-              <button class="w-chip sec">65-inch OLED TV dimensions</button>
-            </div>
-            <div class="w-chip-row">
-              <span class="w-chip-lbl">Other</span>
-              <button class="w-chip sec">Stand Mixer dimensions</button>
-              <button class="w-chip sec">Teak Garden Sofa Set size</button>
+              <div class="w-av">AI</div>
+              <div class="w-bubble" id="welcomeBubble">${welcomeHtml}</div>
             </div>
           </div>
 
@@ -411,8 +373,6 @@ class StreamxChat extends HTMLElement {
               </svg>
             </button>
           </div>
-
-          <div class="w-footer">Powered by StreamX</div>
         </div>
       </div>
     `;
@@ -430,10 +390,6 @@ class StreamxChat extends HTMLElement {
     s.getElementById('sendBtn').addEventListener('click',    () => this._sendMessage());
     s.getElementById('input').addEventListener('keydown',    e  => this._handleKey(e));
     s.getElementById('input').addEventListener('input',      e  => this._autoResize(e.target));
-
-    s.querySelectorAll('.w-chip').forEach(btn =>
-      btn.addEventListener('click', () => this._sendChip(btn))
-    );
   }
 
   /* ─── helpers ──────────────────────────────────────────────── */
@@ -456,12 +412,14 @@ class StreamxChat extends HTMLElement {
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36);
     sessionStorage.setItem('streamx-chat-session', this._sessionId);
+    const cleared = (this.getAttribute('welcome') || StreamxChat.DEFAULT_WELCOME)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
     s.getElementById('messages').innerHTML = `
       <div class="w-msg bot">
-        <div class="w-av">SX</div>
-        <div class="w-bubble">Conversation cleared. How can I help you?</div>
+        <div class="w-av">AI</div>
+        <div class="w-bubble" id="welcomeBubble">${cleared}</div>
       </div>`;
-    s.getElementById('chips').style.display = '';
   }
 
   _autoResize(el) {
@@ -471,13 +429,6 @@ class StreamxChat extends HTMLElement {
 
   _handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._sendMessage(); }
-  }
-
-  _sendChip(btn) {
-    const input = this._shadow.getElementById('input');
-    input.value = btn.textContent;
-    this._shadow.getElementById('chips').style.display = 'none';
-    this._sendMessage();
   }
 
   _ts() {
@@ -491,7 +442,7 @@ class StreamxChat extends HTMLElement {
 
     const av = document.createElement('div');
     av.className = 'w-av';
-    av.textContent = role === 'bot' ? 'SX' : 'You';
+    av.textContent = role === 'bot' ? 'AI' : 'You';
 
     const bub = document.createElement('div');
     bub.className = 'w-bubble';
@@ -520,7 +471,7 @@ class StreamxChat extends HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'w-msg bot typing';
     wrap.id = 'typing';
-    wrap.innerHTML = `<div class="w-av">SX</div><div class="w-bubble"><div class="w-dot"></div><div class="w-dot"></div><div class="w-dot"></div></div>`;
+    wrap.innerHTML = `<div class="w-av">AI</div><div class="w-bubble"><div class="w-dot"></div><div class="w-dot"></div><div class="w-dot"></div></div>`;
     msgs.appendChild(wrap);
     msgs.scrollTop = msgs.scrollHeight;
   }
@@ -545,7 +496,6 @@ class StreamxChat extends HTMLElement {
 
     this._streaming = true;
     s.getElementById('sendBtn').disabled = true;
-    s.getElementById('chips').style.display = 'none';
     input.value = '';
     input.style.height = 'auto';
 

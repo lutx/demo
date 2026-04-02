@@ -1218,8 +1218,9 @@ The chat UI is a `<streamx-chat>` Web Component using Shadow DOM — no CSS leak
 
 <streamx-chat
   api-url="https://rag.yourdomain.com"
-  title="Product Assistant"
-  placeholder="Ask about any product…"
+  title="Assistant"
+  placeholder="Type your question…"
+  welcome="How can we help? Ask in any language."
   auto-open="1500">
 </streamx-chat>
 ```
@@ -1230,9 +1231,10 @@ The widget auto-detects the host from the current page URL — no code changes n
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| `api-url` | `http://localhost:8081` | RAG service base URL |
-| `title` | `Product Assistant` | Header text shown in the widget |
-| `placeholder` | `Ask about any product…` | Input placeholder text |
+| `api-url` | Same origin as the page | RAG service base URL |
+| `title` | `Assistant` | Header text shown in the widget |
+| `placeholder` | `Type your question…` | Input placeholder text |
+| `welcome` | Generic greeting (see component) | First bot message — set per site or brand to match your catalogue |
 | `auto-open` | _(disabled)_ | Auto-opens the widget after N milliseconds |
 
 ### Session management
